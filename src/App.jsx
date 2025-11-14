@@ -4,14 +4,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './pages/LoginScreen';
 import StaffDashboard from './pages/staff/StaffDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+
 import RequireRole from './components/RequireRole';
+
+// Pages
 import ContractTemplatePage from './pages/staff/ContractTemplatePage';
-import ContractTermPage from './pages/staff/ContractTermPage';
+// import ContractTermPage removed vì đã gộp chung
 import ItemListPage from "./pages/staff/ItemListPage";
 import PackageListPage from "./pages/staff/PackageListPage";
 import PostPackageListPage from "./pages/staff/PostPackageListPage";
-
-
 
 export default function App() {
   return (
@@ -32,48 +33,39 @@ export default function App() {
             }
           />
 
-          <Route
-  path="/staff/contract-terms"
-  element={
-    <RequireRole allowedRoles={['Staff']}>
-      <ContractTermPage />
-    </RequireRole>
-  }
-/>
-<Route
-  path="/staff/items"
-  element={
-    <RequireRole allowedRoles={['Staff']}>
-      <ItemListPage />
-    </RequireRole>
-  }
-/>
-
-<Route
-  path="/staff/packages"
-  element={
-    <RequireRole allowedRoles={['Staff']}>
-      <PackageListPage />
-    </RequireRole>
-  }
-/>
-
-<Route
-  path="/staff/post-packages"
-  element={
-    <RequireRole allowedRoles={['Staff']}>
-      <PostPackageListPage />
-    </RequireRole>
-  }
-/>
-
-
-          {/* CONTRACT TEMPLATE PAGE */}
+          {/* STAFF PAGES */}
           <Route
             path="/staff/contract-templates"
             element={
               <RequireRole allowedRoles={['Staff']}>
                 <ContractTemplatePage />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/staff/items"
+            element={
+              <RequireRole allowedRoles={['Staff']}>
+                <ItemListPage />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/staff/packages"
+            element={
+              <RequireRole allowedRoles={['Staff']}>
+                <PackageListPage />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/staff/post-packages"
+            element={
+              <RequireRole allowedRoles={['Staff']}>
+                <PostPackageListPage />
               </RequireRole>
             }
           />
@@ -88,7 +80,7 @@ export default function App() {
             }
           />
 
-          {/* DEFAULT */}
+          {/* DEFAULT REDIRECT */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
