@@ -2,7 +2,8 @@
 import axios from 'axios';
 
 // const baseURL = import.meta.env.VITE_BASE_URL;
-const baseURL = 'http://192.168.100.49:5246/api/';
+// const baseURL = 'http://192.168.100.49:5246/api/';
+const baseURL = 'http://localhost:5246/api/';
 
 const config = {
   baseURL,

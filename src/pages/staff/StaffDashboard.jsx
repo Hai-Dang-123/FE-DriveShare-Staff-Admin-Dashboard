@@ -1,101 +1,371 @@
-// screens/StaffDashboard.js
-import React from 'react';
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
-// Tái sử dụng các icon từ AdminDashboard hoặc import từ file chung
-const TruckIcon = () => (
-  <svg className="w-8 h-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5h10.5M1.5 14.25V6a2.25 2.25 0 012.25-2.25h15A2.25 2.25 0 0122.5 6v8.25m-1.5 4.5H3.375" />
-  </svg>
-);
-const DriverIcon = () => (
-  <svg className="w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-const PendingIcon = () => (
-  <svg className="w-8 h-8 text-yellow-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-// Component StatCard (Tái sử dụng)
-const StatCard = ({ title, value, icon }) => (
-  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-    <div className="flex justify-between items-start mb-4">
-      {icon}
-    </div>
-    <div className="text-gray-500 text-sm uppercase">{title}</div>
-    <div className="text-3xl font-bold text-gray-900">{value}</div>
+// ICON WRAPPER
+const IconBox = ({ children, color = "text-indigo-500" }) => (
+  <div className={`w-9 h-9 ${color} flex items-center justify-center`}>
+    {children}
   </div>
 );
 
+// SIDEBAR ITEM
+const SidebarItem = ({ label, to, icon, active }) => {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      onClick={() => navigate(to)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+        ${active ? "bg-indigo-600 text-white shadow" : "text-gray-700 hover:bg-gray-200"}
+      `}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+};
 
 export default function StaffDashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // ========================
+  // MENU CHUẨN — KHÔNG CÓ Contract Terms
+  // ========================
+  const menu = [
+    {
+      label: "Dashboard",
+      to: "/staff",
+      icon: (
+        <IconBox>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+              d="M3 12l2-2m0 0l7-7 7 7m-9-7v18"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+{
+      label: "Users",
+      to: "/staff/users",
+      icon: (
+        <IconBox color="text-indigo-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+    label: "Document Reviews",
+    to: "/staff/document-reviews",
+    icon: (
+      <IconBox color="text-rose-500">
+        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12h6m-6 4h6M7 8h10M5 4h14a2 2 0 012 2v14l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2z"
+          />
+        </svg>
+      </IconBox>
+    ),
+  },
+    {
+      label: "Contract Templates",
+      to: "/staff/contract-templates",
+      icon: (
+        <IconBox color="text-green-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m6-6H6" />
+          </svg>
+        </IconBox>
+      ),
+    },
+{
+      label: "Delivery Record Templates",
+      to: "/staff/delivery-record-templates",
+      icon: (
+        <IconBox color="text-orange-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+      label: "Items",
+      to: "/staff/items",
+      icon: (
+        <IconBox color="text-blue-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+
+    {
+      label: "Packages",
+      to: "/staff/packages",
+      icon: (
+        <IconBox color="text-purple-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 7l9-4 9 4-9 4-9-4zm0 6l9 4 9-4"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+
+    {
+      label: "Post Packages",
+      to: "/staff/post-packages",
+      icon: (
+        <IconBox color="text-yellow-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 17a4 4 0 11-7 0 4 4 0 017 0zm13 0a4 4 0 11-7 0 4 4 0 017 0z"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+  label: "Post Trips",
+  to: "/staff/post-trips",
+  icon: (
+    <IconBox color="text-teal-500">
+      <svg
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 7l9-4 9 4M4 10h16M4 14h16M4 18h16"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+{
+      label: "Trips",
+      to: "/staff/trips",
+      icon: (
+        <IconBox color="text-cyan-500">
+          <svg
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h10M4 18h7"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+  label: "Vehicles",
+  to: "/staff/vehicles",
+  icon: (
+    <IconBox color="text-red-500">
+      <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 16v-2a4 4 0 014-4h8a4 4 0 014 4v2M6 20h.01M18 20h.01M5 10l1-2h12l1 2"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+
+{
+  label: "Vehicle Document Reviews",
+  to: "/staff/vehicle-document-reviews",
+  icon: (
+    <IconBox color="text-teal-600">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6.75 7.5h10.5m-10.5 3h10.5m-10.5 3h6M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+
+
+  ];
+
+  
+
   return (
-    <div className="p-8 bg-gray-50 min-h-full">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Staff Dashboard</h1>
-      <p className="text-gray-600 mb-8">
-        Welcome, staff user. Here are your current tasks.
-      </p>
+    <div className="flex min-h-screen bg-gray-100">
+      
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-white shadow-lg p-5 space-y-2">
 
-      {/* Lưới các Thẻ Thông tin */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Pending Shipments"
-          value="12"
-          icon={<PendingIcon />}
-        />
-        <StatCard
-          title="Active Shipments"
-          value="84"
-          icon={<TruckIcon />}
-        />
-        <StatCard
-          title="Drivers Online"
-          value="250"
-          icon={<DriverIcon />}
-        />
-        <StatCard
-          title="Support Tickets"
-          value="3"
-          icon={<div className="w-8 h-8 text-red-500">...</div>} // Thay bằng icon support
-        />
-      </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Staff Menu</h2>
 
-      {/* Bảng dữ liệu (ví dụ: các đơn hàng cần duyệt) */}
-      <div className="mt-10 bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-xl font-semibold mb-4">Awaiting Approval</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shipment ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {/* Dữ liệu mẫu */}
-              <tr>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#DS-1024</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">LogiCorp</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">John Doe</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                    Pending
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <a href="#" className="text-indigo-600 hover:text-indigo-900">Review</a>
-                </td>
-              </tr>
-              {/* Thêm các dòng khác... */}
-            </tbody>
-          </table>
+        {menu.map((item, idx) => (
+          <SidebarItem
+            key={idx}
+            {...item}
+            active={location.pathname === item.to}
+          />
+        ))}
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-10">
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">Staff Dashboard</h1>
+
+        <p className="text-gray-600 mb-10">
+          Welcome, staff user. Manage your workflow efficiently.
+        </p>
+
+        {/* KPI CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* CARD 1 */}
+          <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-3">
+              <IconBox color="text-yellow-500">
+                <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0"
+                  />
+                </svg>
+              </IconBox>
+            </div>
+
+            <div className="text-gray-500 text-sm uppercase">Pending Shipments</div>
+            <div className="text-3xl font-bold">12</div>
+          </div>
+
+          {/* CARD 2 */}
+          <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-3">
+              <IconBox color="text-green-600">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l18 0" />
+                </svg>
+              </IconBox>
+            </div>
+
+            <div className="text-gray-500 text-sm uppercase">Active Shipments</div>
+            <div className="text-3xl font-bold">84</div>
+          </div>
+
+          {/* CARD 3 */}
+          <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-3">
+              <IconBox color="text-blue-500">
+                <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 6a3 3 0 110 6 3 3 0 010-6z"
+                  />
+                </svg>
+              </IconBox>
+            </div>
+
+            <div className="text-gray-500 text-sm uppercase">Drivers Online</div>
+            <div className="text-3xl font-bold">250</div>
+          </div>
+
+          {/* CARD 4 */}
+          <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+            <div className="flex justify-between items-start mb-3">
+              <IconBox color="text-red-500">
+                <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01" />
+                </svg>
+              </IconBox>
+            </div>
+
+            <div className="text-gray-500 text-sm uppercase">Support Tickets</div>
+            <div className="text-3xl font-bold">3</div>
+          </div>
         </div>
-      </div>
+
+        {/* TABLE */}
+        <div className="mt-12 bg-white p-6 rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-4">Awaiting Approval</h2>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+                <tr>
+                  <th className="px-6 py-3 text-left">Shipment ID</th>
+                  <th className="px-6 py-3 text-left">Provider</th>
+                  <th className="px-6 py-3 text-left">Driver</th>
+                  <th className="px-6 py-3 text-left">Status</th>
+                  <th className="px-6 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-gray-200">
+                <tr>
+                  <td className="px-6 py-4 font-medium text-gray-900">#DS-1024</td>
+                  <td className="px-6 py-4 text-gray-600">LogiCorp</td>
+                  <td className="px-6 py-4 text-gray-600">John Doe</td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
+                      Pending
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+      </main>
     </div>
   );
 }
