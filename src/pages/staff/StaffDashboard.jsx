@@ -49,7 +49,36 @@ export default function StaffDashboard() {
         </IconBox>
       ),
     },
-
+{
+      label: "Users",
+      to: "/staff/users",
+      icon: (
+        <IconBox color="text-indigo-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+    label: "Document Reviews",
+    to: "/staff/document-reviews",
+    icon: (
+      <IconBox color="text-rose-500">
+        <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 12h6m-6 4h6M7 8h10M5 4h14a2 2 0 012 2v14l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2z"
+          />
+        </svg>
+      </IconBox>
+    ),
+  },
     {
       label: "Contract Templates",
       to: "/staff/contract-templates",
@@ -61,7 +90,21 @@ export default function StaffDashboard() {
         </IconBox>
       ),
     },
-
+{
+      label: "Delivery Record Templates",
+      to: "/staff/delivery-record-templates",
+      icon: (
+        <IconBox color="text-orange-500">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 7h12M8 12h12M8 17h12M3 7h.01M3 12h.01M3 17h.01"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
     {
       label: "Items",
       to: "/staff/items",
@@ -109,7 +152,88 @@ export default function StaffDashboard() {
         </IconBox>
       ),
     },
+    {
+  label: "Post Trips",
+  to: "/staff/post-trips",
+  icon: (
+    <IconBox color="text-teal-500">
+      <svg
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 7l9-4 9 4M4 10h16M4 14h16M4 18h16"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+{
+      label: "Trips",
+      to: "/staff/trips",
+      icon: (
+        <IconBox color="text-cyan-500">
+          <svg
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h10M4 18h7"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+  label: "Vehicles",
+  to: "/staff/vehicles",
+  icon: (
+    <IconBox color="text-red-500">
+      <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 16v-2a4 4 0 014-4h8a4 4 0 014 4v2M6 20h.01M18 20h.01M5 10l1-2h12l1 2"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+
+{
+  label: "Vehicle Document Reviews",
+  to: "/staff/vehicle-document-reviews",
+  icon: (
+    <IconBox color="text-teal-600">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M6.75 7.5h10.5m-10.5 3h10.5m-10.5 3h6M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z"
+        />
+      </svg>
+    </IconBox>
+  ),
+},
+
+
   ];
+
+  
 
   return (
     <div className="flex min-h-screen bg-gray-100">
