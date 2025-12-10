@@ -111,7 +111,7 @@ export default function DocumentReviewDetail() {
 
       if (res.data?.isSuccess) {
         alert(res.data.message || "Review successfully.");
-        navigate("/staff/document-reviews");
+          navigate("/staff/users");
       } else {
         alert(res.data?.message || "Review failed.");
       }
@@ -138,7 +138,8 @@ export default function DocumentReviewDetail() {
           </div>
 
           <button
-            onClick={() => navigate("/staff/document-reviews")}
+            onClick={() => navigate("/staff/users")}
+
             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             ← Back to list
@@ -213,6 +214,11 @@ export default function DocumentReviewDetail() {
                     <span className="font-medium">Last updated: </span>
                     {formatDateTime(detail.lastUpdatedAt)}
                   </p>
+                  {detail.rejectionReason && (
+    <p className="text-sm text-red-600 mt-2">
+      <span className="font-medium">Reject reason:</span> {detail.rejectionReason}
+    </p>
+  )}
                 </div>
               </div>
 

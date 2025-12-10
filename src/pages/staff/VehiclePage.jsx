@@ -1,10 +1,107 @@
-// src/pages/staff/VehiclePage.jsx
-import React, { useEffect, useState } from "react";
+// ========================================================================
+// STAFF – VEHICLE PAGE (AIRBNB STYLE, 2 CỘT: LIST + DETAIL)
+// Không dùng modal. Panel bên phải hiển thị luôn Vehicle + Documents.
+// ========================================================================
+
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../configs/api";
 
 const PAGE_SIZE = 10;
 
+/* ===========================================================
+   BADGE – VEHICLE STATUS
+=========================================================== */
+function VehicleStatusBadge({ status }) {
+  const base =
+    "inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold";
+
+  switch (status) {
+    case "ACTIVE":
+    case "IN_USE":
+      return (
+        <span
+          className={`${base} bg-green-50 text-green-700 border border-green-200`}
+        >
+          {status}
+        </span>
+      );
+    case "INACTIVE":
+      return (
+        <span
+          className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}
+        >
+          {status}
+        </span>
+      );
+    case "DELETED":
+      return (
+        <span
+          className={`${base} bg-gray-100 text-gray-500 border border-gray-200`}
+        >
+          {status}
+        </span>
+      );
+    default:
+      return (
+        <span
+          className={`${base} bg-slate-50 text-slate-600 border border-slate-200`}
+        >
+          {status || "N/A"}
+        </span>
+      );
+  }
+}
+
+/* ===========================================================
+   BADGE – DOCUMENT STATUS
+=========================================================== */
+function DocumentStatusBadge({ status }) {
+  if (!status || status === "N/A")
+    return <span className="text-xs text-gray-400">No docs</span>;
+
+  const base =
+    "inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold";
+
+  switch (status) {
+    case "PENDING_REVIEW":
+      return (
+        <span
+          className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}
+        >
+          Pending
+        </span>
+      );
+    case "ACTIVE":
+      return (
+        <span
+          className={`${base} bg-emerald-50 text-emerald-700 border border-emerald-200`}
+        >
+          Active
+        </span>
+      );
+    case "REJECTED":
+      return (
+        <span
+          className={`${base} bg-red-50 text-red-700 border border-red-200`}
+        >
+          Rejected
+        </span>
+      );
+    default:
+      return (
+        <span
+          className={`${base} bg-gray-50 text-gray-600 border border-gray-200`}
+        >
+          {status}
+        </span>
+      );
+  }
+}
+
+/* ===========================================================
+   MAIN PAGE
+=========================================================== */
 export default function VehiclePage() {
   const navigate = useNavigate();
 
@@ -14,26 +111,32 @@ export default function VehiclePage() {
     pageSize: PAGE_SIZE,
     totalPages: 0,
     totalCount: 0,
-    hasPreviousPage: false,
-    hasNextPage: false,
   });
 
   const [pageNumber, setPageNumber] = useState(1);
   const [loadingList, setLoadingList] = useState(false);
 
+  // Selected vehicle for right panel
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
-  // ========= SEARCH & SORT ==========
+  // Search & sort
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState(null);
+  const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState("ASC");
 
-  // ========== API CALLS ==========
+  // Image fullscreen preview
+  const [previewImage, setPreviewImage] = useState(null);
 
+  // Scroll to first pending doc
+  const pendingRef = useRef(null);
+
+  /* ===========================================================
+     FETCH VEHICLES
+  ============================================================ */
   const fetchVehicles = async () => {
     setLoadingList(true);
+
     try {
       const res = await api.get("/Vehicle", {
         params: {
@@ -45,37 +148,48 @@ export default function VehiclePage() {
         },
       });
 
-      if (res.data?.isSuccess && res.data?.result) {
+      if (res.data?.isSuccess && res.data.result) {
         const pg = res.data.result;
-        setVehicles(pg.data || []);
+
+        const mapped = (pg.data || []).map((v) => {
+          const docs = v.documents || [];
+
+          const hasPending = docs.some((d) => d.status === "PENDING_REVIEW");
+          const hasRejected = docs.some((d) => d.status === "REJECTED");
+          const hasActive = docs.some((d) => d.status === "ACTIVE");
+
+          const documentStatus =
+            (hasPending && "PENDING_REVIEW") ||
+            (hasRejected && "REJECTED") ||
+            (hasActive && "ACTIVE") ||
+            "N/A";
+
+          return {
+            ...v,
+            documents: docs,
+            documentStatus,
+          };
+        });
+
+        setVehicles(mapped);
         setPagination(pg);
 
-        if (!selectedVehicleId && pg.data?.length > 0) {
-          const id = pg.data[0].vehicleId;
-          setSelectedVehicleId(id);
-          fetchVehicleDetail(id);
+        // Auto select
+        if (mapped.length > 0) {
+          let selected =
+            mapped.find((x) => x.vehicleId === selectedVehicleId) || mapped[0];
+          setSelectedVehicleId(selected.vehicleId);
+          setSelectedVehicle(selected);
+        } else {
+          setSelectedVehicleId(null);
+          setSelectedVehicle(null);
         }
       }
     } catch (err) {
       console.error("Error fetching vehicles", err);
-    } finally {
-      setLoadingList(false);
     }
-  };
 
-  const fetchVehicleDetail = async (id) => {
-    if (!id) return;
-    setLoadingDetail(true);
-    try {
-      const res = await api.get(`/Vehicle/${id}`);
-      if (res.data?.isSuccess) {
-        setSelectedVehicle(res.data.result);
-      } else setSelectedVehicle(null);
-    } catch {
-      setSelectedVehicle(null);
-    } finally {
-      setLoadingDetail(false);
-    }
+    setLoadingList(false);
   };
 
   useEffect(() => {
@@ -83,264 +197,498 @@ export default function VehiclePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageNumber, search, sortBy, sortOrder]);
 
-  // ================= UI HELPERS =================
-  const statusColor = (status) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-green-100 text-green-700";
-      case "INACTIVE":
-        return "bg-yellow-100 text-yellow-700";
-      case "DELETED":
-        return "bg-gray-300 text-gray-700";
-      default:
-        return "bg-gray-100 text-gray-700";
+  // khi vehicles hoặc selectedVehicleId thay đổi, sync selectedVehicle
+  useEffect(() => {
+    if (!vehicles || vehicles.length === 0) {
+      setSelectedVehicle(null);
+      return;
     }
-  };
 
+    if (!selectedVehicleId) {
+      setSelectedVehicle(vehicles[0]);
+      setSelectedVehicleId(vehicles[0].vehicleId);
+      return;
+    }
+
+    const found = vehicles.find((v) => v.vehicleId === selectedVehicleId);
+    if (found) setSelectedVehicle(found);
+  }, [vehicles, selectedVehicleId]);
+
+  // Scroll tới document pending đầu tiên
+  const firstPendingId =
+    selectedVehicle?.documents?.find((d) => d.status === "PENDING_REVIEW")
+      ?.vehicleDocumentId || null;
+
+  useEffect(() => {
+    if (firstPendingId && pendingRef.current) {
+      pendingRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [firstPendingId]);
+
+  /* ===========================================================
+     UI HELPERS
+  ============================================================ */
   const formatDate = (value) => {
     if (!value) return "-";
     const d = new Date(value);
     return isNaN(d) ? "-" : d.toLocaleDateString();
   };
 
-  // ================ RENDER UI =================
+  /* ===========================================================
+     RENDER
+  ============================================================ */
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      {/* HEADER */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="text-sm text-gray-500">Staff / Vehicles</div>
-          <h1 className="text-3xl font-bold text-gray-900">Vehicles</h1>
+    <div className="min-h-screen bg-[#f5f5f7]">
+      {/* ⭐ UPDATED: container rộng hơn để panel to hơn */}
+      <div className="max-w-[1600px] mx-auto px-10 py-8">
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-1">
+              Staff / Vehicles
+            </div>
+            <h1 className="text-3xl font-semibold text-gray-900">Vehicles</h1>
+          </div>
+
+          <button
+            onClick={() => navigate("/staff")}
+            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            ← Back to Dashboard
+          </button>
         </div>
 
-        <button
-          onClick={() => navigate("/staff")}
-          className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          ← Back to Dashboard
-        </button>
-      </div>
-
-      <div className="grid grid-cols-12 gap-6">
-        {/* LEFT LIST */}
-        <div className="col-span-5 bg-white rounded-xl shadow p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800">All Vehicles</h2>
-            <span className="text-sm text-gray-500">
-              {pagination.totalCount} total
-            </span>
-          </div>
-
-          {/* SEARCH */}
-          <input
-            type="text"
-            placeholder="Search plate / model / brand..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm mb-3"
-          />
-
-          {/* SORT */}
-          <div className="flex items-center gap-2 mb-3">
-            <select
-              className="border px-2 py-1 rounded text-sm"
-              value={sortBy || ""}
-              onChange={(e) => setSortBy(e.target.value || null)}
-            >
-              <option value="">Sort by...</option>
-              <option value="brand">Brand</option>
-              <option value="model">Model</option>
-              <option value="year">Year</option>
-              <option value="payload">Payload</option>
-              <option value="volume">Volume</option>
-              <option value="createdAt">Created At</option>
-            </select>
-
-            <select
-              className="border px-2 py-1 rounded text-sm"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-            >
-              <option value="ASC">ASC</option>
-              <option value="DESC">DESC</option>
-            </select>
-          </div>
-
-          {/* TABLE */}
-          <div className="flex-1 overflow-y-auto border rounded-lg">
-            {loadingList ? (
-              <div className="p-4 text-sm text-gray-500">Loading...</div>
-            ) : vehicles.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500">No vehicles found.</div>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Plate</th>
-                    <th className="px-3 py-2 text-left">Model/Brand</th>
-                    <th className="px-3 py-2 text-left">Type</th>
-                    <th className="px-3 py-2 text-left">Owner</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vehicles.map((v) => (
-                    <tr
-                      key={v.vehicleId}
-                      onClick={() => {
-                        setSelectedVehicleId(v.vehicleId);
-                        fetchVehicleDetail(v.vehicleId);
-                      }}
-                      className={`cursor-pointer border-t ${
-                        selectedVehicleId === v.vehicleId
-                          ? "bg-gray-100"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="px-3 py-2 font-semibold">{v.plateNumber}</td>
-                      <td className="px-3 py-2">
-                        {v.model}
-                        <div className="text-xs text-gray-500">
-                          {v.brand} • {v.yearOfManufacture}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        {v.vehicleType?.vehicleTypeName || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {v.owner?.companyName || v.owner?.fullName || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(
-                            v.status
-                          )}`}
-                        >
-                          {v.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* PAGINATION */}
-          <div className="flex justify-end items-center gap-3 mt-3">
-            <button
-              disabled={!pagination.hasPreviousPage}
-              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Prev
-            </button>
-            <span>
-              Page {pagination.currentPage} / {pagination.totalPages}
-            </span>
-            <button
-              disabled={!pagination.hasNextPage}
-              onClick={() => setPageNumber((p) => p + 1)}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT: DETAIL */}
-        <div className="col-span-7 bg-white rounded-xl shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Vehicle Detail
-          </h2>
-
-          {loadingDetail ? (
-            <div className="text-sm text-gray-500">Loading detail...</div>
-          ) : !selectedVehicle ? (
-            <div className="text-sm text-gray-500">Select a vehicle to view details.</div>
-          ) : (
-            <VehicleDetail selectedVehicle={selectedVehicle} formatDate={formatDate} statusColor={statusColor} />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function VehicleDetail({ selectedVehicle, formatDate, statusColor }) {
-  return (
-    <div className="space-y-6 text-sm">
-      {/* Basic */}
-      <section>
-        <h3 className="font-semibold text-gray-900 mb-2">Basic Info</h3>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-          <InfoRow label="Plate" value={selectedVehicle.plateNumber} />
-          <InfoRow
-            label="Status"
-            value={
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(selectedVehicle.status)}`}>
-                {selectedVehicle.status}
-              </span>
-            }
-          />
-          <InfoRow label="Model" value={selectedVehicle.model} />
-          <InfoRow label="Brand" value={selectedVehicle.brand} />
-          <InfoRow label="Year" value={selectedVehicle.yearOfManufacture} />
-          <InfoRow label="Color" value={selectedVehicle.color} />
-          <InfoRow label="Payload (kg)" value={selectedVehicle.payloadInKg} />
-          <InfoRow label="Volume (m³)" value={selectedVehicle.volumeInM3} />
-        </div>
-      </section>
-
-      {/* Type */}
-      <section>
-        <h3 className="font-semibold text-gray-900 mb-2">Vehicle Type</h3>
-        <div className="border p-3 rounded bg-gray-50">
-          <div className="font-semibold">
-            {selectedVehicle.vehicleType?.vehicleTypeName}
-          </div>
-          <div className="text-xs text-gray-600">{selectedVehicle.vehicleType?.description}</div>
-        </div>
-      </section>
-
-      {/* Owner */}
-      <section>
-        <h3 className="font-semibold text-gray-900 mb-2">Owner</h3>
-        {selectedVehicle.owner ? (
-          <div className="border p-3 rounded bg-gray-50">
-            <div className="font-medium">{selectedVehicle.owner.fullName}</div>
-            <div className="text-xs text-gray-600">{selectedVehicle.owner.companyName}</div>
-          </div>
-        ) : (
-          "-"
-        )}
-      </section>
-
-      {/* Images */}
-      <section>
-        <h3 className="font-semibold text-gray-900 mb-2">Images</h3>
-        {selectedVehicle.imageUrls?.length > 0 ? (
-          <div className="grid grid-cols-3 gap-3">
-            {selectedVehicle.imageUrls.map((img) => (
-              <div key={img.vehicleImageId} className="border rounded overflow-hidden">
-                <img src={img.imageURL} className="w-full h-32 object-cover" />
+        {/* GRID 2 CỘT */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* LEFT – LIST */}
+          {/* ⭐ UPDATED: 5 -> 6 để khung list rộng hơn */}
+          <div className="col-span-6">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex flex-col h-[560px]">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    All Vehicles
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Quick overview & document status
+                  </p>
+                </div>
+                <span className="text-xs text-gray-500">
+                  <span className="font-semibold text-gray-900">
+                    {pagination.totalCount}
+                  </span>{" "}
+                  total
+                </span>
               </div>
-            ))}
+
+              {/* SEARCH */}
+              <div className="mb-3">
+                <input
+                  type="text"
+                  placeholder="Search plate / model / brand..."
+                  value={search}
+                  onChange={(e) => {
+                    setPageNumber(1);
+                    setSearch(e.target.value);
+                  }}
+                  className="w-full text-sm rounded-full border border-gray-200 px-4 py-2.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+                />
+              </div>
+
+              {/* SORT */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>Sort by</span>
+                  <select
+                    className="border border-gray-200 rounded-full text-xs px-2 py-1 bg-white"
+                    value={sortBy}
+                    onChange={(e) => {
+                      setPageNumber(1);
+                      setSortBy(e.target.value);
+                    }}
+                  >
+                    <option value="">Default</option>
+                    <option value="brand">Brand</option>
+                    <option value="model">Model</option>
+                    <option value="year">Year</option>
+                    <option value="payload">Payload</option>
+                    <option value="volume">Volume</option>
+                    <option value="createdAt">Created At</option>
+                  </select>
+
+                  <select
+                    className="border border-gray-200 rounded-full text-xs px-2 py-1 bg-white"
+                    value={sortOrder}
+                    onChange={(e) => {
+                      setPageNumber(1);
+                      setSortOrder(e.target.value);
+                    }}
+                  >
+                    <option value="ASC">ASC</option>
+                    <option value="DESC">DESC</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* TABLE */}
+              <div className="flex-1 overflow-hidden rounded-xl border border-gray-100 bg-white">
+                {loadingList ? (
+                  <div className="p-4 text-sm text-gray-500">Loading...</div>
+                ) : vehicles.length === 0 ? (
+                  <div className="p-4 text-sm text-gray-500">
+                    No vehicles found.
+                  </div>
+                ) : (
+                  <div className="max-h-[360px] overflow-y-auto custom-scrollbar">
+                    {/* ⭐ UPDATED: dùng w-full để tránh scrollbar ngang */}
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr className="text-xs text-gray-500">
+                          <th className="px-4 py-2 text-left font-medium">
+                            Plate
+                          </th>
+                          <th className="px-4 py-2 text-left font-medium">
+                            Model
+                          </th>
+                          <th className="px-4 py-2 text-left font-medium">
+                            Owner
+                          </th>
+                          <th className="px-4 py-2 text-left font-medium">
+                            Status
+                          </th>
+                          <th className="px-4 py-2 text-left font-medium">
+                            Docs
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {vehicles.map((v) => {
+                          const isSelected =
+                            selectedVehicleId === v.vehicleId;
+                          return (
+                            <tr
+                              key={v.vehicleId}
+                              onClick={() => {
+                                setSelectedVehicleId(v.vehicleId);
+                                setSelectedVehicle(v);
+                              }}
+                              className={`cursor-pointer transition-colors ${
+                                isSelected
+                                  ? "bg-indigo-50/70"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                                {v.plateNumber}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm text-gray-900">
+                                  {v.model}
+                                </div>
+                                <div className="text-[11px] text-gray-500">
+                                  {v.brand}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-800">
+                                {v.owner?.fullName || "-"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <VehicleStatusBadge status={v.status} />
+                              </td>
+                              <td className="px-4 py-3">
+                                <DocumentStatusBadge
+                                  status={v.documentStatus}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* PAGINATION */}
+              <div className="flex justify-between items-center mt-4 text-xs text-gray-500">
+                <div>
+                  Page{" "}
+                  <span className="font-medium">
+                    {pagination.currentPage || 1}
+                  </span>{" "}
+                  /{" "}
+                  <span className="font-medium">
+                    {pagination.totalPages || 1}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    disabled={pageNumber <= 1}
+                    onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1 rounded-full border border-gray-200 bg-white text-xs font-medium disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    disabled={
+                      !pagination.totalPages ||
+                      pageNumber >= pagination.totalPages
+                    }
+                    onClick={() => setPageNumber((p) => p + 1)}
+                    className="px-3 py-1 rounded-full border border-gray-200 bg-white text-xs font-medium disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
-          "No images"
+
+          {/* RIGHT – DETAIL + DOCUMENTS */}
+          {/* ⭐ UPDATED: 7 -> 6 cho cân 2 panel */}
+          <div className="col-span-6">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 h-[560px] flex flex-col">
+              {!selectedVehicle ? (
+                <div className="h-full flex items-center justify-center text-sm text-gray-500">
+                  Select a vehicle on the left to view details.
+                </div>
+              ) : (
+                <>
+                  {/* HEADER DETAIL */}
+                  <div className="flex items-start justify-between mb-5">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+                        Vehicle
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-semibold text-gray-900">
+                          {selectedVehicle.plateNumber}
+                        </h2>
+                        <VehicleStatusBadge status={selectedVehicle.status} />
+                        <DocumentStatusBadge
+                          status={selectedVehicle.documentStatus}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {selectedVehicle.brand} • {selectedVehicle.model} •{" "}
+                        {selectedVehicle.yearOfManufacture}
+                      </p>
+                    </div>
+
+                    <div className="text-right text-xs text-gray-500">
+                      <div>
+                        Created:{" "}
+                        <span className="font-medium">
+                          {formatDate(selectedVehicle.createdAt)}
+                        </span>
+                      </div>
+                      {selectedVehicle.owner && (
+                        <div className="mt-1">
+                          Owner:{" "}
+                          <span className="font-medium">
+                            {selectedVehicle.owner.fullName}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* BODY SCROLLABLE */}
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+                    {/* BASIC INFO */}
+                    <section>
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                        Basic information
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <InfoRow label="Brand" value={selectedVehicle.brand} />
+                        <InfoRow label="Model" value={selectedVehicle.model} />
+                        <InfoRow
+                          label="Year"
+                          value={selectedVehicle.yearOfManufacture}
+                        />
+                        <InfoRow label="Color" value={selectedVehicle.color} />
+                        <InfoRow
+                          label="Payload (kg)"
+                          value={selectedVehicle.payloadInKg}
+                        />
+                        <InfoRow
+                          label="Volume (m³)"
+                          value={selectedVehicle.volumeInM3}
+                        />
+                      </div>
+                    </section>
+
+                    {/* OWNER */}
+                    {selectedVehicle.owner && (
+                      <section>
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                          Owner
+                        </h3>
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm">
+                          <div className="font-medium text-gray-900">
+                            {selectedVehicle.owner.fullName}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {selectedVehicle.owner.companyName}
+                          </div>
+                        </div>
+                      </section>
+                    )}
+
+                    {/* DOCUMENTS */}
+                    <section>
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                        Vehicle documents
+                      </h3>
+
+                      {(!selectedVehicle.documents ||
+                        selectedVehicle.documents.length === 0) && (
+                        <div className="text-xs text-gray-500">
+                          No documents uploaded for this vehicle.
+                        </div>
+                      )}
+
+                      <div className="space-y-4">
+                        {selectedVehicle.documents?.map((doc) => {
+                          const isPending = doc.status === "PENDING_REVIEW";
+                          const isTarget =
+                            doc.vehicleDocumentId === firstPendingId;
+
+                          return (
+                            <div
+                              key={doc.vehicleDocumentId}
+                              ref={isTarget ? pendingRef : null}
+                              className={`rounded-xl border shadow-sm p-4 transition ${
+                                isPending
+                                  ? "border-amber-300 bg-amber-50/60"
+                                  : "border-gray-100 bg-gray-50"
+                              }`}
+                            >
+                              {/* HEADER */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div>
+                                  <div className="text-xs uppercase tracking-wide text-gray-400">
+                                    Document
+                                  </div>
+                                  <div className="text-sm font-semibold text-gray-900">
+                                    {doc.documentType}
+                                  </div>
+                                  <div className="text-[11px] text-gray-500 mt-1">
+                                    Expire: {formatDate(doc.expirationDate)}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <DocumentStatusBadge status={doc.status} />
+                                  {doc.adminNotes && (
+                                    <div className="text-[11px] text-gray-500 mt-1 max-w-[180px]">
+                                      {doc.adminNotes}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* THUMBNAILS */}
+                              <div className="grid grid-cols-2 gap-3">
+                                <div
+                                  className="cursor-pointer group"
+                                  onClick={() =>
+                                    setPreviewImage(doc.frontDocumentUrl)
+                                  }
+                                >
+                                  <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                    <img
+                                      src={doc.frontDocumentUrl}
+                                      alt="Front"
+                                      className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  </div>
+                                  <div className="text-[11px] text-gray-600 mt-1">
+                                    Front
+                                  </div>
+                                </div>
+
+                                {doc.backDocumentUrl && (
+                                  <div
+                                    className="cursor-pointer group"
+                                    onClick={() =>
+                                      setPreviewImage(doc.backDocumentUrl)
+                                    }
+                                  >
+                                    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                      <img
+                                        src={doc.backDocumentUrl}
+                                        alt="Back"
+                                        className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+                                      />
+                                    </div>
+                                    <div className="text-[11px] text-gray-600 mt-1">
+                                      Back
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* REVIEW BUTTON */}
+                              {(doc.status === "PENDING_REVIEW" ||
+                                doc.status === "REJECTED") && (
+                                <button
+                                  onClick={() =>
+                                    navigate(
+                                      `/staff/vehicle-document-reviews/${doc.vehicleDocumentId}`
+                                    )
+                                  }
+                                  className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2"
+                                >
+                                  Review
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* FULLSCREEN IMAGE PREVIEW */}
+        {previewImage && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
+            <img
+              src={previewImage}
+              alt="Preview"
+              className="max-w-[90%] max-h-[90%] rounded-2xl shadow-2xl"
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-6 right-6 text-white text-3xl font-bold"
+            >
+              ✕
+            </button>
+          </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
 
+/* ===========================================================
+   SMALL INFO ROW COMPONENT
+=========================================================== */
 function InfoRow({ label, value }) {
   return (
     <div className="flex flex-col text-xs">
       <span className="text-gray-500">{label}</span>
-      <span className="text-gray-900 text-sm">{value ?? "-"}</span>
+      <span className="text-sm text-gray-900">{value ?? "-"}</span>
     </div>
   );
 }
