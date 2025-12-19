@@ -1,84 +1,523 @@
-// screens/AdminDashboard.js
-import React from 'react';
+import React, { useEffect, useState, useRef } from "react";
 
-// Icons (nên tách ra file riêng, nhưng để tạm ở đây cho tiện)
-const UsersIcon = () => (
-  <svg className="w-8 h-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 00-3.742-.565M18 18.72a9.094 9.094 0 01-3.742-.565m3.742.565a9.094 9.094 0 00-3.742-.565M12 3c-3.135 0-6 2.69-6 6v3.75c0 3.315 2.865 6 6 6s6-2.685 6-6V9c0-3.31-2.865-6-6-6zM6 9c0 1.503 1.007 2.75 2.25 2.75S10.5 10.503 10.5 9s-1.007-2.75-2.25-2.75S6 7.497 6 9zm6 0c0 1.503 1.007 2.75 2.25 2.75S16.5 10.503 16.5 9s-1.007-2.75-2.25-2.75S12 7.497 12 9z" />
-  </svg>
-);
-const TruckIcon = () => (
-  <svg className="w-8 h-8 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5h10.5M1.5 14.25V6a2.25 2.25 0 012.25-2.25h15A2.25 2.25 0 0122.5 6v8.25m-1.5 4.5H3.375" />
-  </svg>
-);
-const DollarIcon = () => (
-  <svg className="w-8 h-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-6h6m-6.75-9.75a9 9 0 0113.5 0m-13.5 0a9 9 0 0013.5 0M4.25 6.75a9 9 0 0115.5 0m-15.5 0a9 9 0 0015.5 0" />
-  </svg>
-);
+import { useNavigate, useLocation } from "react-router-dom";
+import api from "../../configs/api";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
-const StatCard = ({ title, value, icon, change, changeType }) => (
-  <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-    <div className="flex justify-between items-start mb-4">
-      {icon}
-      <span className={`text-sm font-semibold ${changeType === 'inc' ? 'text-green-500' : 'text-red-500'}`}>
-        {change}
-      </span>
-    </div>
-    <div className="text-gray-500 text-sm uppercase">{title}</div>
-    <div className="text-3xl font-bold text-gray-900">{value}</div>
+// ICON WRAPPER
+const IconBox = ({ children, color = "text-indigo-500" }) => (
+  <div className={`w-9 h-9 ${color} flex items-center justify-center`}>
+    {children}
   </div>
 );
 
-export default function AdminDashboard() {
+// SIDEBAR ITEM
+const SidebarItem = ({ label, to, icon, active }) => {
+  const navigate = useNavigate();
+
   return (
-    <div className="p-8 bg-gray-50 min-h-full">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-      <p className="text-gray-600 mb-8">
-        Welcome, administrator. Here's the system overview.
-      </p>
+    <button
+      onClick={() => navigate(to)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+        ${active ? "bg-indigo-600 text-white shadow" : "text-gray-700 hover:bg-gray-200"}
+      `}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+};
 
-      {/* Lưới các Thẻ Thông tin */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Revenue (Month)"
-          value="$120,450"
-          icon={<DollarIcon />}
-          change="+12.5%"
-          changeType="inc"
-        />
-        <StatCard
-          title="Total Shipments"
-          value="8,920"
-          icon={<TruckIcon />}
-          change="+8.2%"
-          changeType="inc"
-        />
-        <StatCard
-          title="Total Users"
-          value="1,500"
-          icon={<UsersIcon />}
-          change="+3"
-          changeType="inc"
-        />
-        <StatCard
-          title="System Health"
-          value="99.9% Uptime"
-          icon={<div className="w-8 h-8 text-green-500">...</div>} // Thay bằng icon health
-          change="All Good"
-          changeType="inc"
-        />
-      </div>
+export default function AdminDashboard() {
+  const location = useLocation();
+const hasFetchedRef = useRef(false);
 
-      {/* Thêm các biểu đồ hoặc bảng dữ liệu ở đây */}
-      <div className="mt-10 bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-xl font-semibold mb-4">Revenue Over Time</h2>
-        {/* Chỗ này để component biểu đồ (chart) */}
-        <div className="h-64 bg-gray-200 rounded flex items-center justify-center">
-          <p className="text-gray-500">[Chart Placeholder]</p>
+  // ========================
+  // ADMIN MENU — GIỐNG STAFF
+  // ========================
+  const menu = [
+    {
+      label: "Dashboard",
+      to: "/admin",
+      icon: (
+        <IconBox>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+              d="M3 12l2-2 7-7 7 7m-9-7v18"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+      label: "Users",
+      to: "/admin/users",
+      icon: (
+        <IconBox>
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+    {
+      label: "Transactions",
+      to: "/admin/transactions",
+      icon: (
+        <IconBox color="text-green-600">
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 8c-3.866 0-7 1.79-7 4s3.134 4 7 4 7-1.79 7-4-3.134-4-7-4z"
+            />
+          </svg>
+        </IconBox>
+      ),
+    },
+  ];
+
+  // ========================
+  // DASHBOARD STATE
+  // ========================
+  const [rangeMonths, setRangeMonths] = useState(3);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [overview, setOverview] = useState({
+    totalUsers: 0,
+    totalTrips: 0,
+    totalRevenue: 0,
+    totalPackages: 0,
+  });
+
+  const [packagesByStatus, setPackagesByStatus] = useState([]); // [{name,value}]
+  const [tripsByStatus, setTripsByStatus] = useState([]); // [{name,value}]
+  const [revenueSeries, setRevenueSeries] = useState([]); // [{label,value}]
+  const [tripsCreatedSeries, setTripsCreatedSeries] = useState([]); // [{label,value}]
+
+  const PIE_COLORS = ["#6366F1", "#22C55E", "#F59E0B", "#EF4444", "#06B6D4", "#A855F7", "#64748B"];
+
+  // ========================
+  // HELPERS
+  // ========================
+  const getDateRange = (months) => {
+    const now = new Date();
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const from = new Date(to);
+    from.setMonth(from.getMonth() - months);
+    from.setHours(0, 0, 0, 0);
+    return { from, to };
+  };
+
+  const toIsoForQuery = (d) => {
+    // BE nhận DateTime from/to (Swagger đang parse OK với ISO)
+    return d.toISOString();
+  };
+
+  const pickNumber = (obj, keys, fallback = 0) => {
+    for (const k of keys) {
+      if (obj && obj[k] !== undefined && obj[k] !== null) return Number(obj[k]) || 0;
+    }
+    return fallback;
+  };
+
+  const normalizeStatusSeries = (arr) => {
+    const list = Array.isArray(arr) ? arr : [];
+    return list.map((x) => ({
+      name: x.status ?? x.Status ?? x.role ?? x.Role ?? "UNKNOWN",
+      value: Number(x.count ?? x.Count ?? x.value ?? x.Value) || 0,
+    }));
+  };
+
+  const normalizeTimeSeries = (arr) => {
+    const list = Array.isArray(arr) ? arr : [];
+    return list.map((x) => ({
+      label: x.label ?? x.Label ?? "",
+      value: Number(x.value ?? x.Value) || 0,
+    }));
+  };
+
+  const formatCurrency = (v) => {
+    const n = Number(v) || 0;
+    return n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+  };
+
+  const activePackagesCount = (() => {
+    const active = packagesByStatus.find((x) => String(x.name).toUpperCase() === "ACTIVE");
+    return active?.value || 0;
+  })();
+
+  // ========================
+  // FETCH
+  // ========================
+  const fetchDashboard = async () => {
+  if (loading) return; // 🔒 chặn spam request
+  setError("");
+  setLoading(true);
+
+
+    try {
+      const { from, to } = getDateRange(rangeMonths);
+
+      const [
+        overviewRes,
+        tripsByStatusRes,
+        packagesByStatusRes,
+        revenueRes,
+        tripsCreatedRes,
+      ] = await Promise.all([
+        api.get("/Admin/overview"),
+        api.get("/Admin/trips/by-status"),
+        api.get("/Admin/packages/by-status"),
+        api.get("/Admin/revenue", {
+          params: { from: toIsoForQuery(from), to: toIsoForQuery(to), groupBy: "month" },
+        }),
+        // optional (nếu BE chưa có data thì vẫn OK)
+        api.get("/Admin/trips/created", {
+          params: { from: toIsoForQuery(from), to: toIsoForQuery(to), groupBy: "month" },
+        }),
+      ]);
+
+      // OVERVIEW
+      if (overviewRes?.data?.isSuccess) {
+        const r = overviewRes.data.result || {};
+        setOverview({
+          totalUsers: pickNumber(r, ["totalUsers", "TotalUsers"]),
+          totalTrips: pickNumber(r, ["totalTrips", "TotalTrips"]),
+          totalRevenue: pickNumber(r, ["totalRevenue", "TotalRevenue"]),
+          totalPackages: pickNumber(r, ["totalPackages", "TotalPackages"]),
+        });
+      }
+
+      // TRIPS BY STATUS
+      if (tripsByStatusRes?.data?.isSuccess) {
+        setTripsByStatus(normalizeStatusSeries(tripsByStatusRes.data.result));
+      } else {
+        setTripsByStatus([]);
+      }
+
+      // PACKAGES BY STATUS
+      if (packagesByStatusRes?.data?.isSuccess) {
+        setPackagesByStatus(normalizeStatusSeries(packagesByStatusRes.data.result));
+      } else {
+        setPackagesByStatus([]);
+      }
+
+      // REVENUE
+      if (revenueRes?.data?.isSuccess) {
+        setRevenueSeries(normalizeTimeSeries(revenueRes.data.result));
+      } else {
+        setRevenueSeries([]);
+      }
+
+      // TRIPS CREATED (OPTIONAL)
+      if (tripsCreatedRes?.data?.isSuccess) {
+        setTripsCreatedSeries(normalizeTimeSeries(tripsCreatedRes.data.result));
+      } else {
+        setTripsCreatedSeries([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Không tải được dữ liệu dashboard. Vui lòng thử lại.");
+      setOverview({ totalUsers: 0, totalTrips: 0, totalRevenue: 0, totalPackages: 0 });
+      setTripsByStatus([]);
+      setPackagesByStatus([]);
+      setRevenueSeries([]);
+      setTripsCreatedSeries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+  if (hasFetchedRef.current) {
+    fetchDashboard();
+    return;
+  }
+
+  hasFetchedRef.current = true;
+  fetchDashboard();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [rangeMonths]);
+
+
+  return (
+    <div className="flex min-h-screen bg-gray-100">
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-white shadow-lg p-5 space-y-2">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">Admin Menu</h2>
+
+        {menu.map((item, idx) => (
+          <SidebarItem
+            key={idx}
+            {...item}
+            active={location.pathname === item.to}
+          />
+        ))}
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-10">
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+            <p className="text-gray-600">
+              Welcome, admin user. Manage the system efficiently.
+            </p>
+          </div>
+
+          {/* RANGE TOGGLE */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Range</span>
+            <div className="bg-white rounded-full shadow-sm border p-1 flex">
+              <button
+                onClick={() => setRangeMonths(3)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                  rangeMonths === 3 ? "bg-indigo-600 text-white" : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                3 months
+              </button>
+              <button
+                onClick={() => setRangeMonths(6)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                  rangeMonths === 6 ? "bg-indigo-600 text-white" : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                6 months
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* ERROR */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* LOADING HINT */}
+        {loading && (
+          <div className="mb-6 text-sm text-gray-500">
+            Loading dashboard data...
+          </div>
+        )}
+
+        {/* ========================
+            HÀNG 1 – KPI CARDS
+        ========================= */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <KpiCard title="Total Users" value={overview.totalUsers} color="text-indigo-600" />
+          <KpiCard title="Total Trips" value={overview.totalTrips} color="text-blue-600" />
+          <KpiCard title="Total Revenue" value={formatCurrency(overview.totalRevenue)} color="text-green-600" />
+          <KpiCard title="Active Packages" value={activePackagesCount} color="text-emerald-600" />
+        </div>
+
+        {/* ========================
+            HÀNG 2 – BIỂU ĐỒ CHÍNH
+        ========================= */}
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Revenue over time */}
+          <div className="lg:col-span-7 bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Revenue over time</h2>
+              <span className="text-xs text-gray-500">
+                Last {rangeMonths} months
+              </span>
+            </div>
+
+            {revenueSeries.length === 0 ? (
+              <div className="h-[280px] flex items-center justify-center text-gray-500 text-sm">
+                No revenue data yet
+              </div>
+            ) : (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={revenueSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value) => [formatCurrency(value), "Revenue"]}
+                      labelStyle={{ fontSize: 12 }}
+                      contentStyle={{ borderRadius: 10 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#16A34A"
+                      strokeWidth={2.5}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Trips by status */}
+          <div className="lg:col-span-5 bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Trips by status</h2>
+              <span className="text-xs text-gray-500">Distribution</span>
+            </div>
+
+            {tripsByStatus.length === 0 ? (
+              <div className="h-[280px] flex items-center justify-center text-gray-500 text-sm">
+                No data
+              </div>
+            ) : (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={tripsByStatus}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={95}
+                      paddingAngle={2}
+                    >
+                      {tripsByStatus.map((_, idx) => (
+                        <Cell key={`cell-trip-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => [v, "Trips"]} />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ========================
+            HÀNG 3 – BIỂU ĐỒ PHỤ
+        ========================= */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Packages by status */}
+          <div className="lg:col-span-5 bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Packages by status</h2>
+              <span className="text-xs text-gray-500">Distribution</span>
+            </div>
+
+            {packagesByStatus.length === 0 ? (
+              <div className="h-[280px] flex items-center justify-center text-gray-500 text-sm">
+                No data
+              </div>
+            ) : (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={packagesByStatus}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={95}
+                      paddingAngle={2}
+                    >
+                      {packagesByStatus.map((_, idx) => (
+                        <Cell key={`cell-pkg-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => [v, "Packages"]} />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Trips created (optional) */}
+          <div className="lg:col-span-7 bg-white p-6 rounded-xl shadow">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Trips created (optional)</h2>
+              <span className="text-xs text-gray-500">
+                Last {rangeMonths} months
+              </span>
+            </div>
+
+            {tripsCreatedSeries.length === 0 ? (
+              <div className="h-[280px] flex items-center justify-center text-gray-500 text-sm">
+                No data
+              </div>
+            ) : (
+              <div className="h-[280px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={tripsCreatedSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(value) => [value, "Trips"]} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#6366F1"
+                      strokeWidth={2.5}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* REFRESH BUTTON (NHẸ) */}
+        <div className="mt-8">
+          <button
+            onClick={fetchDashboard}
+            className="px-4 py-2 rounded-lg bg-white border shadow-sm text-sm font-medium hover:bg-gray-50"
+          >
+            Refresh
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ========================
+// KPI CARD — GIỐNG STAFF
+// ========================
+function KpiCard({ title, value, color }) {
+  return (
+    <div className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition">
+      <div className="flex justify-between items-start mb-3">
+        <IconBox color={color}>
+          <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5" />
+          </svg>
+        </IconBox>
       </div>
+
+      <div className="text-gray-500 text-sm uppercase">{title}</div>
+      <div className="text-3xl font-bold">{value}</div>
     </div>
   );
 }

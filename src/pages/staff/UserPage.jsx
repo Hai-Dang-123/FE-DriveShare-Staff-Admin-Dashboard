@@ -124,33 +124,44 @@ export default function UserPage() {
   const [userDocuments, setUserDocuments] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
 
+// DRIVER ACTIVITY LOGS
+const [activityLogs, setActivityLogs] = useState([]);
+const [logLoading, setLogLoading] = useState(false);
+
+  
   const pendingRef = useRef(null);
 
-  // ==========================
-  // FETCH USER DOC STATUS
-  // ==========================
-  const fetchUserDocumentStatus = async (userId) => {
-    if (!userId) return "NONE";
 
-    try {
-      const res = await api.get(`/UserDocument/user/${userId}`);
-      if (!res.data?.isSuccess) return "NONE";
 
-      const docs = res.data.result?.documents || [];
-      if (!docs.length) return "NONE";
+const approveActivation = async () => {
+  if (!selectedUser) return;
 
-      const pending = docs.find((d) => d.status === "PENDING_REVIEW");
-      if (pending) return "PENDING_REVIEW";
+  if (!window.confirm("Bạn chắc chắn muốn kích hoạt lại tài khoản này?"))
+    return;
 
-      const sorted = [...docs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      return sorted[0].status || "NONE";
-    } catch {
-      return "NONE";
+  try {
+    const res = await api.post(
+      `/User/approve-activation/${selectedUser.userId}?isApproved=true`
+    );
+
+    if (!res.data?.isSuccess) {
+      alert(res.data?.message || "Kích hoạt thất bại");
+      return;
     }
-  };
+
+    alert("Kích hoạt tài khoản thành công");
+
+    setSelectedUser(null);
+    setUserDocuments([]);
+    await fetchUsers();
+  } catch {
+    alert("Lỗi khi kích hoạt tài khoản");
+  }
+};
+
 
   // ==========================
-  // FETCH FULL DOCUMENTS
+  // FETCH FULL DOCUMENTS (CHỈ GỌI KHI CLICK USER)
   // ==========================
   const fetchUserDocuments = async (userId, scroll = true) => {
     if (!userId) {
@@ -160,12 +171,26 @@ export default function UserPage() {
 
     try {
       const res = await api.get(`/UserDocument/user/${userId}`);
-      if (!res.data?.isSuccess) return setUserDocuments([]);
+      if (!res.data?.isSuccess) {
+        setUserDocuments([]);
+        // update badge docs cho đúng flow (không ảnh hưởng UI)
+        setUsers((prev) => prev.map((u) => (u.userId === userId ? { ...u, documentStatus: "NONE" } : u)));
+        return;
+      }
 
       const docs = res.data.result?.documents || [];
       docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       setUserDocuments(docs);
+
+      // Update docs status cho đúng user đang chọn (không gọi thêm API)
+      let docStatus = "NONE";
+      if (docs.length) {
+        const pending = docs.find((d) => d.status === "PENDING_REVIEW");
+        if (pending) docStatus = "PENDING_REVIEW";
+        else docStatus = docs[0].status || "NONE";
+      }
+      setUsers((prev) => prev.map((u) => (u.userId === userId ? { ...u, documentStatus: docStatus } : u)));
 
       if (scroll) {
         const firstPending = docs.find((d) => d.status === "PENDING_REVIEW");
@@ -175,8 +200,40 @@ export default function UserPage() {
       }
     } catch (err) {
       setUserDocuments([]);
+      setUsers((prev) => prev.map((u) => (u.userId === userId ? { ...u, documentStatus: "NONE" } : u)));
     }
   };
+
+  // ==========================
+// FETCH DRIVER ACTIVITY LOGS
+// ==========================
+const fetchUserLogs = async (userId) => {
+  if (!userId) {
+    setActivityLogs([]);
+    return;
+  }
+
+  try {
+    setLogLoading(true);
+
+    const res = await api.get(`/DriverActivityLog/driver/${userId}`);
+    if (!res.data?.isSuccess) {
+      setActivityLogs([]);
+      return;
+    }
+
+    const logs = res.data.result?.data || [];
+    logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    setActivityLogs(logs);
+  } catch {
+    setActivityLogs([]);
+  } finally {
+    setLogLoading(false);
+  }
+};
+
+
   // ==========================
   // DEBOUNCE SEARCH
   // ==========================
@@ -186,7 +243,7 @@ export default function UserPage() {
   }, [searchInput]);
 
   // ==========================
-  // FETCH USERS
+  // FETCH USERS (CHỈ GỌI /User)
   // ==========================
   const fetchUsers = async () => {
     setLoading(true);
@@ -218,24 +275,21 @@ export default function UserPage() {
         phoneNumber: u.phoneNumber,
         avatarUrl: u.avatarUrl,
         status: u.status,
-        roleName: u.roleName || (u.role && u.role.roleName),
+       roleName: typeof u.role === "string"
+  ? u.role
+  : u.roleName || u.role?.roleName,
+
         createdAt: u.createdAt,
         dateOfBirth: u.dateOfBirth,
         isEmailVerified: u.isEmailVerified,
         isPhoneVerified: u.isPhoneVerified,
         address: u.address,
+        documentStatus: u.documentStatus || "NONE",
+  hasPendingDocumentRequest: u.hasPendingDocumentRequest === true,
       }));
 
-      // Gắn thêm documentStatus
-      const withDocStatus = await Promise.all(
-        normalized.map(async (u) => {
-          const docStatus = await fetchUserDocumentStatus(u.userId);
-          return { ...u, documentStatus: docStatus };
-        })
-      );
-
-      setUsers(withDocStatus);
-      setTotalCount(res.data.result?.totalCount || withDocStatus.length);
+      setUsers(normalized);
+      setTotalCount(res.data.result?.totalCount || normalized.length);
     } catch (err) {
       console.error(err);
       setError("Error while fetching users.");
@@ -256,7 +310,7 @@ export default function UserPage() {
     .filter((u) => !roleFilter || getRoleName(u).toLowerCase() === roleFilter.toLowerCase());
 
   // ==========================
-  // AUTO SYNC SELECTED USER
+  // AUTO SYNC SELECTED USER (✅ FIX FLOW: KHÔNG auto gọi detail)
   // ==========================
   useEffect(() => {
     const visible = users
@@ -269,13 +323,11 @@ export default function UserPage() {
       return;
     }
 
-    // Nếu selectedUser hiện tại vẫn tồn tại → giữ nguyên
-    if (selectedUser && visible.some((u) => u.userId === selectedUser.userId)) return;
-
-    // Auto chọn user đầu tiên
-    const first = visible[0];
-    setSelectedUser(first);
-    fetchUserDocuments(first.userId, true);
+    // Nếu selectedUser hiện tại không còn trong list (do filter) thì clear
+    if (selectedUser && !visible.some((u) => u.userId === selectedUser.userId)) {
+      setSelectedUser(null);
+      setUserDocuments([]);
+    }
   }, [users, roleFilter]);
 
   // ==========================
@@ -320,6 +372,7 @@ export default function UserPage() {
 
   const firstPendingDocId =
     userDocuments.find((d) => d.status === "PENDING_REVIEW")?.userDocumentId || null;
+
   // ==========================
   // MAIN UI RETURN – 2 CỘT
   // ==========================
@@ -346,11 +399,9 @@ export default function UserPage() {
 
         {/* GRID 2 CỘT (6 / 6) */}
         <div className="grid grid-cols-12 gap-6">
-
-          {/* LEFT — USER LIST (6 CỘT) */}
+          {/* LEFT — USER LIST */}
           <div className="col-span-7">
-         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex flex-col h-[700px]">
-
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex flex-col h-[700px]">
 
               {/* TITLE */}
               <div className="flex items-center justify-between mb-4">
@@ -365,8 +416,6 @@ export default function UserPage() {
 
               {/* FILTERS */}
               <div className="space-y-3 mb-4">
-
-                {/* ROLE + SEARCH */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <label className="text-xs font-medium text-gray-700">Role</label>
@@ -387,7 +436,7 @@ export default function UserPage() {
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       placeholder="Name, email, phone..."
-                      className="border border-gray-200 rounded-full px-3 py-1.5 text-xs bg-gray-50 w-56 focus:ring-2 focus:ring-indigo-200"
+                      className="border border-gray-200 rounded-full px-3 py-1.5 text-xs bg-gray-50 w-56"
                     />
                   </div>
                 </div>
@@ -413,7 +462,7 @@ export default function UserPage() {
                 </div>
               </div>
 
-              {/* TABLE LIST */}
+              {/* TABLE */}
               <div className="flex-1 overflow-hidden rounded-xl border border-gray-100 bg-white">
                 {loading ? (
                   <div className="p-4 text-sm text-gray-500">Loading...</div>
@@ -422,82 +471,65 @@ export default function UserPage() {
                 ) : filteredUsers.length === 0 ? (
                   <div className="p-4 text-sm text-gray-500">No users found.</div>
                 ) : (
-                  <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
+                  <div className="max-h-[420px] overflow-y-auto">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr className="text-xs text-gray-500">
-                          <th className="px-4 py-2 text-left font-medium">User</th>
-                          <th
-                            className="px-4 py-2 text-left font-medium cursor-pointer"
-                            onClick={() => handleHeaderSort("fullname")}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              Full Name {renderSortIcon("fullname")}
-                            </span>
-                          </th>
-                          <th
-                            className="px-4 py-2 text-left font-medium cursor-pointer"
-                            onClick={() => handleHeaderSort("email")}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              Email {renderSortIcon("email")}
-                            </span>
-                          </th>
-                          <th className="px-4 py-2 text-left font-medium">Role</th>
-                          <th className="px-4 py-2 text-left font-medium">Status</th>
-                          <th className="px-4 py-2 text-left font-medium">Docs</th>
-                          <th
-                            className="px-4 py-2 text-left font-medium cursor-pointer"
-                            onClick={() => handleHeaderSort("createdat")}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              Created At {renderSortIcon("createdat")}
-                            </span>
-                          </th>
+                          <th className="px-4 py-2">User</th>
+                          <th className="px-4 py-2">Full Name</th>
+                          <th className="px-4 py-2">Email</th>
+                          <th className="px-4 py-2">Role</th>
+                          <th className="px-4 py-2">Status</th>
+                         <th className="px-4 py-2">Docs</th>
+                          <th className="px-4 py-2">Created</th>
                         </tr>
                       </thead>
 
                       <tbody className="divide-y divide-gray-100">
                         {filteredUsers.map((u) => {
-                          const roleName = getRoleName(u);
                           const isSelected = selectedUser?.userId === u.userId;
-
                           return (
                             <tr
-                              key={u.userId}
-                              className={`cursor-pointer transition-colors ${
-                                isSelected ? "bg-indigo-50/70" : "hover:bg-gray-50"
-                              }`}
-                              onClick={() => {
-                                setSelectedUser(u);
-                                fetchUserDocuments(u.userId, true);
-                              }}
-                            >
+  key={u.userId}
+  className={`cursor-pointer
+     ${u.status === "BANNED" ? "bg-red-50 text-red-700" : ""}
+    ${u.hasPendingDocumentRequest ? "bg-yellow-50 border-l-4 border-yellow-400" : ""}
+     ${isSelected && u.status !== "BANNED" ? "bg-indigo-50/70" : "hover:bg-gray-50"}
+  `}
+  onClick={() => {
+  setSelectedUser(u);
+  fetchUserDocuments(u.userId, true);
+
+  if (getRoleName(u) === "Driver") {
+    fetchUserLogs(u.userId);
+  } else {
+    setActivityLogs([]);
+  }
+}}
+
+>
+
                               <td className="px-4 py-3">
                                 <AvatarCell avatarUrl={u.avatarUrl} fullName={u.fullName} />
                               </td>
+                              <td className="px-4 py-3 font-medium">{u.fullName}</td>
+                              <td className="px-4 py-3">{u.email}</td>
+                             <td className="px-4 py-3">
+  <RoleBadge role={getRoleName(u)} />
+</td>
 
-                              <td className="px-4 py-3 font-medium text-gray-900">
-                                {u.fullName}
-                              </td>
+<td className="px-4 py-3">
+  <StatusBadge status={u.status} />
+</td>
 
-                              <td className="px-4 py-3 text-gray-700">{u.email}</td>
+<td className="px-4 py-3">
+  <UserDocumentStatusBadge status={u.documentStatus} />
+</td>
 
-                              <td className="px-4 py-3">
-                                <RoleBadge role={roleName} />
-                              </td>
+<td className="px-4 py-3">
+  {formatDate(u.createdAt)}
+</td>
 
-                              <td className="px-4 py-3">
-                                <StatusBadge status={u.status} />
-                              </td>
-
-                              <td className="px-4 py-3">
-                                <UserDocumentStatusBadge status={u.documentStatus} />
-                              </td>
-
-                              <td className="px-4 py-3 text-gray-700">
-                                {formatDate(u.createdAt)}
-                              </td>
                             </tr>
                           );
                         })}
@@ -509,9 +541,8 @@ export default function UserPage() {
 
             </div>
           </div>
-
-          {/* RIGHT — DETAIL PANEL (6 CỘT) */}
-          <div className="col-span-4">
+          {/* RIGHT — DETAIL PANEL */}
+          <div className="col-span-5">
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 h-[600px] flex flex-col">
 
               {!selectedUser ? (
@@ -520,67 +551,49 @@ export default function UserPage() {
                 </div>
               ) : (
                 <>
-                  {/* USER HEADER */}
-                  <div className="flex items-start justify-between mb-5">
-                    <div className="flex items-start gap-4">
-                      <AvatarCell
-                        avatarUrl={selectedUser.avatarUrl}
-                        fullName={selectedUser.fullName}
-                      />
+                  {/* HEADER */}
+                 <div className="flex items-start justify-between mb-5">
+  <div className="flex items-start gap-4">
+    <AvatarCell avatarUrl={selectedUser.avatarUrl} fullName={selectedUser.fullName} />
+    <div>
+      <h2 className="text-xl font-semibold">{selectedUser.fullName}</h2>
+      <div className="flex gap-2 mt-2">
+        <RoleBadge role={getRoleName(selectedUser)} />
+        <StatusBadge status={selectedUser.status} />
+        <UserDocumentStatusBadge status={selectedUser.documentStatus} />
+      </div>
+      <p className="text-xs text-gray-500 mt-2">
+        Email: <span className="font-medium">{selectedUser.email}</span> •
+        Phone: <span className="font-medium">{selectedUser.phoneNumber || "N/A"}</span>
+      </p>
+    </div>
+  </div>
 
-                      <div>
-                        <h2 className="text-xl font-semibold text-gray-900">
-                          {selectedUser.fullName}
-                        </h2>
+  {/* ADMIN ACTIONS */}
+  <div className="flex gap-2">
+    
 
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <RoleBadge role={getRoleName(selectedUser)} />
-                          <StatusBadge status={selectedUser.status} />
-                          <UserDocumentStatusBadge
-                            status={selectedUser.documentStatus}
-                          />
-                        </div>
+    {selectedUser.status === "PENDING_ACTIVATION" && (
+  <button
+    onClick={approveActivation}
+    className="px-3 py-1.5 rounded-full text-xs font-medium
+               bg-green-600 text-white hover:bg-green-700"
+  >
+    ✅ Kích hoạt lại
+  </button>
+)}
 
-                        <p className="text-xs text-gray-500 mt-2">
-                          Email:
-                          <span className="font-medium">{selectedUser.email}</span>
-                          {" • "}
-                          Phone:
-                          <span className="font-medium">{selectedUser.phoneNumber || "N/A"}</span>
-                        </p>
-                      </div>
-                    </div>
+  </div>
+</div>
 
-                    <div className="text-right text-xs text-gray-500">
-                      <div>
-                        Created:
-                        <span className="font-medium">
-                          {" "}
-                          {formatDate(selectedUser.createdAt)}
-                        </span>
-                      </div>
-                      {selectedUser.dateOfBirth && (
-                        <div className="mt-1">
-                          DOB:
-                          <span className="font-medium">
-                            {" "}
-                            {new Date(selectedUser.dateOfBirth).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* BODY SCROLLABLE RIGHT PANEL */}
-                  <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+                  {/* BODY */}
+                  <div className="flex-1 overflow-y-auto space-y-6">
 
                     {/* BASIC INFO */}
                     <section>
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                        Basic Information
-                      </h3>
-
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      <h3 className="text-sm font-semibold mb-3">Basic Information</h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
                         <InfoRow label="Full name" value={selectedUser.fullName} />
                         <InfoRow label="Email" value={selectedUser.email} />
                         <InfoRow label="Phone" value={selectedUser.phoneNumber} />
@@ -588,119 +601,70 @@ export default function UserPage() {
                         <InfoRow label="Status" value={selectedUser.status} />
                       </div>
 
+                      {/* ✅ FIX CRASH: address là object */}
                       {selectedUser.address && (
                         <div className="mt-3">
-                          <InfoRow label="Address" value={selectedUser.address} />
+                          <InfoRow
+                            label="Address"
+                            value={
+                              typeof selectedUser.address === "string"
+                                ? selectedUser.address
+                                : selectedUser.address.address
+                            }
+                          />
                         </div>
                       )}
                     </section>
 
                     {/* DOCUMENTS */}
                     <section>
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                        User Documents
-                      </h3>
+                      <h3 className="text-sm font-semibold mb-3">User Documents</h3>
 
                       {userDocuments.length === 0 ? (
-                        <div className="text-xs text-gray-500">
-                          No documents uploaded for this user.
-                        </div>
+                        <div className="text-xs text-gray-500">No documents uploaded.</div>
                       ) : (
                         <div className="space-y-4">
                           {userDocuments.map((doc) => {
                             const isPending = doc.status === "PENDING_REVIEW";
-                            const isTarget =
-                              firstPendingDocId === doc.userDocumentId;
-
                             return (
                               <div
                                 key={doc.userDocumentId}
-                                ref={isTarget ? pendingRef : null}
-                                className={`rounded-xl border shadow-sm p-4 transition ${
-                                  isPending
-                                    ? "border-yellow-400 bg-yellow-50/70"
-                                    : "border-gray-100 bg-gray-50"
+                                ref={isPending ? pendingRef : null}
+                                className={`rounded-xl border p-4 ${
+                                  isPending ? "border-yellow-400 bg-yellow-50" : "border-gray-100 bg-gray-50"
                                 }`}
                               >
-                                {/* HEADER */}
-                                <div className="flex items-start justify-between mb-3">
+                                <div className="flex justify-between mb-3">
                                   <div>
-                                    <div className="text-xs uppercase tracking-wide text-gray-400">
-                                      Document
-                                    </div>
-                                    <div className="text-sm font-semibold text-gray-900">
-                                      {doc.documentType}
-                                    </div>
-                                    <div className="text-[11px] text-gray-500 mt-1">
+                                    <div className="text-sm font-semibold">{doc.documentType}</div>
+                                    <div className="text-xs text-gray-500">
                                       Created: {formatDate(doc.createdAt)}
                                     </div>
                                   </div>
-
-                                  <div className="text-right">
-                                    <DocumentStatusBadge status={doc.status} />
-
-                                    {doc.rejectionReason && (
-                                      <div className="text-[11px] text-red-600 mt-1 max-w-[180px]">
-                                        Reason: {doc.rejectionReason}
-                                      </div>
-                                    )}
-                                  </div>
+                                  <DocumentStatusBadge status={doc.status} />
                                 </div>
 
-                                {/* THUMBNAILS */}
                                 <div className="grid grid-cols-2 gap-3">
-                                  {/* FRONT */}
-                                  <div
-                                    className="cursor-pointer group"
-                                    onClick={() =>
-                                      setPreviewImage(doc.frontImageUrl)
-                                    }
-                                  >
-                                    <div className="border rounded-lg overflow-hidden max-h-32 bg-white">
-                                      <img
-                                        src={doc.frontImageUrl}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                        alt="Front"
-                                      />
-                                    </div>
-                                    <p className="text-[11px] text-gray-600 mt-1">
-                                      Front
-                                    </p>
-                                  </div>
-
-                                  {/* BACK */}
+                                  <img
+                                    src={doc.frontImageUrl}
+                                    onClick={() => setPreviewImage(doc.frontImageUrl)}
+                                    className="cursor-pointer rounded border"
+                                  />
                                   {doc.backImageUrl && (
-                                    <div
-                                      className="cursor-pointer group"
-                                      onClick={() =>
-                                        setPreviewImage(doc.backImageUrl)
-                                      }
-                                    >
-                                      <div className="border rounded-lg overflow-hidden max-h-32 bg-white">
-                                        <img
-                                          src={doc.backImageUrl}
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                          alt="Back"
-                                        />
-                                      </div>
-                                      <p className="text-[11px] text-gray-600 mt-1">
-                                        Back
-                                      </p>
-                                    </div>
+                                    <img
+                                      src={doc.backImageUrl}
+                                      onClick={() => setPreviewImage(doc.backImageUrl)}
+                                      className="cursor-pointer rounded border"
+                                    />
                                   )}
                                 </div>
 
-                                {/* REVIEW BUTTON */}
                                 {(doc.status === "PENDING_REVIEW" ||
                                   doc.status === "REJECTED" ||
                                   doc.status === "INACTIVE") && (
                                   <button
-                                    onClick={() =>
-                                      navigate(
-                                        `/staff/document-reviews/${doc.userDocumentId}`
-                                      )
-                                    }
-                                    className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2"
+                                    onClick={() => navigate(`/staff/document-reviews/${doc.userDocumentId}`)}
+                                    className="mt-3 w-full rounded-full bg-indigo-600 text-white py-2 text-sm"
                                   >
                                     Review
                                   </button>
@@ -711,6 +675,44 @@ export default function UserPage() {
                         </div>
                       )}
                     </section>
+                    {/* DRIVER ACTIVITY LOGS */}
+{getRoleName(selectedUser) === "Driver" && (
+  <section>
+    <h3 className="text-sm font-semibold mb-3">
+      Driver Activity Logs
+    </h3>
+
+    {logLoading ? (
+      <div className="text-xs text-gray-500">Loading logs...</div>
+    ) : activityLogs.length === 0 ? (
+      <div className="text-xs text-gray-500">No activity logs.</div>
+    ) : (
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {activityLogs.map((log) => (
+          <div
+            key={log.driverActivityLogId}
+            className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs"
+          >
+            <div className="font-medium text-gray-900">
+              {log.action}
+            </div>
+
+            {log.description && (
+              <div className="text-gray-600 mt-1">
+                {log.description}
+              </div>
+            )}
+
+            <div className="text-gray-400 mt-1">
+              {formatDate(log.createdAt)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+)}
+
                   </div>
                 </>
               )}
@@ -718,32 +720,27 @@ export default function UserPage() {
           </div>
         </div>
 
-        {/* IMAGE FULLSCREEN PREVIEW */}
+    
+        {/* IMAGE PREVIEW */}
         {previewImage && (
-          <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
-            <img
-              src={previewImage}
-              className="max-w-[90%] max-h-[90%] rounded-xl shadow-2xl"
-              alt="Preview"
-            />
-
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
+            <img src={previewImage} className="max-w-[90%] max-h-[90%] rounded-xl" />
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute top-5 right-5 text-white text-3xl font-bold"
+              className="absolute top-5 right-5 text-white text-3xl"
             >
               ✕
             </button>
           </div>
         )}
-
       </div>
     </div>
   );
 }
 
-/* ============================================
-   SMALL INFO ROW COMPONENT
-============================================ */
+// =======================
+// INFO ROW
+// =======================
 function InfoRow({ label, value }) {
   return (
     <div className="flex flex-col text-xs">

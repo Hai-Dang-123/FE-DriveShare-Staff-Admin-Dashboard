@@ -1,6 +1,7 @@
 // ========================================================================
 // STAFF – VEHICLE PAGE (AIRBNB STYLE, 2 CỘT: LIST + DETAIL)
-// Không dùng modal. Panel bên phải hiển thị luôn Vehicle + Documents.
+// Không dùng modal. Panel bên phải hiển thị Vehicle + Documents (chỉ khi click).
+// FLOW giống UserPage: vào trang chỉ fetch list, click mới fetch detail + docs.
 // ========================================================================
 
 import React, { useEffect, useState, useRef } from "react";
@@ -12,6 +13,26 @@ const PAGE_SIZE = 10;
 /* ===========================================================
    BADGE – VEHICLE STATUS
 =========================================================== */
+const DOC_STATUS_MAP = {
+  0: "ACTIVE",
+  1: "INACTIVE",
+  2: "DELETED",
+  3: "PENDING_REVIEW",
+  4: "REJECTED",
+};
+
+
+const normalizeDocStatus = (status) => {
+  if (typeof status === "number") {
+    return DOC_STATUS_MAP[status] || "UNKNOWN";
+  }
+  return status;
+};
+
+
+/* ===========================================================
+   BADGE – DOCUMENT STATUS
+=========================================================== */
 function VehicleStatusBadge({ status }) {
   const base =
     "inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold";
@@ -20,33 +41,25 @@ function VehicleStatusBadge({ status }) {
     case "ACTIVE":
     case "IN_USE":
       return (
-        <span
-          className={`${base} bg-green-50 text-green-700 border border-green-200`}
-        >
+        <span className={`${base} bg-green-50 text-green-700 border border-green-200`}>
           {status}
         </span>
       );
     case "INACTIVE":
       return (
-        <span
-          className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}
-        >
+        <span className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}>
           {status}
         </span>
       );
     case "DELETED":
       return (
-        <span
-          className={`${base} bg-gray-100 text-gray-500 border border-gray-200`}
-        >
+        <span className={`${base} bg-gray-100 text-gray-500 border border-gray-200`}>
           {status}
         </span>
       );
     default:
       return (
-        <span
-          className={`${base} bg-slate-50 text-slate-600 border border-slate-200`}
-        >
+        <span className={`${base} bg-slate-50 text-slate-600 border border-slate-200`}>
           {status || "N/A"}
         </span>
       );
@@ -54,46 +67,41 @@ function VehicleStatusBadge({ status }) {
 }
 
 /* ===========================================================
-   BADGE – DOCUMENT STATUS
+   BADGE – DOCUMENT STATUS (SAU NORMALIZE)
 =========================================================== */
 function DocumentStatusBadge({ status }) {
-  if (!status || status === "N/A")
-    return <span className="text-xs text-gray-400">No docs</span>;
-
   const base =
     "inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold";
 
   switch (status) {
     case "PENDING_REVIEW":
       return (
-        <span
-          className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}
-        >
+        <span className={`${base} bg-amber-50 text-amber-700 border border-amber-200`}>
           Pending
         </span>
       );
     case "ACTIVE":
       return (
-        <span
-          className={`${base} bg-emerald-50 text-emerald-700 border border-emerald-200`}
-        >
+        <span className={`${base} bg-emerald-50 text-emerald-700 border border-emerald-200`}>
           Active
         </span>
       );
     case "REJECTED":
       return (
-        <span
-          className={`${base} bg-red-50 text-red-700 border border-red-200`}
-        >
+        <span className={`${base} bg-red-50 text-red-700 border border-red-200`}>
           Rejected
+        </span>
+      );
+    case "INACTIVE":
+      return (
+        <span className={`${base} bg-gray-100 text-gray-700 border border-gray-200`}>
+          Inactive
         </span>
       );
     default:
       return (
-        <span
-          className={`${base} bg-gray-50 text-gray-600 border border-gray-200`}
-        >
-          {status}
+        <span className={`${base} bg-gray-50 text-gray-600 border border-gray-200`}>
+          No docs
         </span>
       );
   }
@@ -116,126 +124,195 @@ export default function VehiclePage() {
   const [pageNumber, setPageNumber] = useState(1);
   const [loadingList, setLoadingList] = useState(false);
 
-  // Selected vehicle for right panel
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  // Search & sort
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState("ASC");
 
-  // Image fullscreen preview
   const [previewImage, setPreviewImage] = useState(null);
 
-  // Scroll to first pending doc
   const pendingRef = useRef(null);
-
+  const requestSeqRef = useRef(0);
   /* ===========================================================
-     FETCH VEHICLES
+     HELPERS: DOC STATUS
   ============================================================ */
-  const fetchVehicles = async () => {
+  const computeDocumentStatus = (docs) => {
+    const list = docs || [];
+    const hasPending = list.some((d) => normalizeDocStatus(d.status) === "PENDING_REVIEW");
+    const hasRejected = list.some((d) => normalizeDocStatus(d.status) === "REJECTED");
+    const hasActive = list.some((d) => normalizeDocStatus(d.status) === "ACTIVE");
+
+    return (
+      (hasPending && "PENDING_REVIEW") ||
+      (hasRejected && "REJECTED") ||
+      (hasActive && "ACTIVE") ||
+      "NONE"
+    );
+  };
+  /* ===========================================================
+     FETCH VEHICLES (LIST ONLY) ✅ FIX FLOW
+     - chỉ gọi /Vehicle
+     - không dùng documents từ list nữa
+     - không auto select
+  ============================================================ */
+ const fetchVehicles = async () => {
     setLoadingList(true);
-
     try {
-      const res = await api.get("/Vehicle", {
-        params: {
-          pageNumber,
-          pageSize: PAGE_SIZE,
-          search,
-          sortBy,
-          sortOrder,
-        },
-      });
+      const params = {
+        pageNumber,
+        pageSize: PAGE_SIZE,
+      };
+      if (search) params.search = search.trim();
+      if (sortBy) {
+        params.sortBy = sortBy.toLowerCase();
+        params.sortOrder = sortOrder;
+      }
 
-      if (res.data?.isSuccess && res.data.result) {
+      const res = await api.get("/Vehicle", { params });
+      if (res.data?.isSuccess) {
         const pg = res.data.result;
+       setVehicles(
+  (pg.data || []).map((v) => ({
+    ...v,
+    documentStatus: normalizeDocStatus(v.documentStatus),
+    hasPendingDocumentRequest: v.hasPendingDocumentRequest === true,
+  }))
+);
 
-        const mapped = (pg.data || []).map((v) => {
-          const docs = v.documents || [];
-
-          const hasPending = docs.some((d) => d.status === "PENDING_REVIEW");
-          const hasRejected = docs.some((d) => d.status === "REJECTED");
-          const hasActive = docs.some((d) => d.status === "ACTIVE");
-
-          const documentStatus =
-            (hasPending && "PENDING_REVIEW") ||
-            (hasRejected && "REJECTED") ||
-            (hasActive && "ACTIVE") ||
-            "N/A";
-
-          return {
-            ...v,
-            documents: docs,
-            documentStatus,
-          };
-        });
-
-        setVehicles(mapped);
         setPagination(pg);
-
-        // Auto select
-        if (mapped.length > 0) {
-          let selected =
-            mapped.find((x) => x.vehicleId === selectedVehicleId) || mapped[0];
-          setSelectedVehicleId(selected.vehicleId);
-          setSelectedVehicle(selected);
-        } else {
-          setSelectedVehicleId(null);
-          setSelectedVehicle(null);
-        }
       }
     } catch (err) {
-      console.error("Error fetching vehicles", err);
+      console.error(err);
+      setVehicles([]);
     }
-
     setLoadingList(false);
   };
 
   useEffect(() => {
     fetchVehicles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageNumber, search, sortBy, sortOrder]);
 
-  // khi vehicles hoặc selectedVehicleId thay đổi, sync selectedVehicle
-  useEffect(() => {
-    if (!vehicles || vehicles.length === 0) {
-      setSelectedVehicle(null);
-      return;
+  /* ===========================================================
+     FETCH VEHICLE DETAIL (CHỈ GỌI KHI CLICK) ✅ FIX FLOW
+  ============================================================ */
+  const fetchVehicleDetail = async (vehicleId) => {
+    if (!vehicleId) return;
+    setLoadingDetail(true);
+    const seq = ++requestSeqRef.current;
+
+    try {
+      const res = await api.get(`/Vehicle/${vehicleId}`);
+      if (seq !== requestSeqRef.current) return;
+
+      if (res.data?.isSuccess) {
+        setSelectedVehicle((prev) => ({
+          ...res.data.result,
+          documents: prev?.documents || [],
+          documentStatus: prev?.documentStatus || "NONE",
+        }));
+      }
+    } catch (err) {
+      console.error(err);
     }
+    setLoadingDetail(false);
+  };
+  /* ===========================================================
+     FETCH VEHICLE DOCUMENTS (CHỈ GỌI KHI CLICK) ✅ FIX FLOW
+     Endpoint giả định: /VehicleDocument/vehicle/{vehicleId}
+     (nếu BE bạn khác path, bạn nói đúng path tôi chỉnh đúng 1 dòng)
+  ============================================================ */
+  const fetchVehicleDocuments = async (vehicleId, scroll = true) => {
+    if (!vehicleId) return;
+    setLoadingDocs(true);
+    const seq = ++requestSeqRef.current;
 
-    if (!selectedVehicleId) {
-      setSelectedVehicle(vehicles[0]);
-      setSelectedVehicleId(vehicles[0].vehicleId);
-      return;
+    try {
+      const res = await api.get(`/VehicleDocument/vehicle/${vehicleId}`);
+      if (seq !== requestSeqRef.current) return;
+
+      if (!res.data?.isSuccess) {
+        setSelectedVehicle((prev) => ({
+          ...prev,
+          documents: [],
+          documentStatus: "NONE",
+        }));
+        return;
+      }
+
+      const docsRaw = res.data.result?.documents || res.data.result || [];
+      const docs = docsRaw.map((d) => ({
+        ...d,
+        status: normalizeDocStatus(d.status),
+      }));
+
+      docs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      const docStatus = computeDocumentStatus(docs);
+      const hasPending = docStatus === "PENDING_REVIEW";
+
+      setSelectedVehicle((prev) => ({
+        ...prev,
+        documents: docs,
+        documentStatus: docStatus,
+      }));
+
+      setVehicles((prev) =>
+        prev.map((v) =>
+          v.vehicleId === vehicleId
+            ? {
+                ...v,
+                documentStatus: docStatus,
+                hasPendingDocumentRequest: hasPending,
+              }
+            : v
+        )
+      );
+
+      if (scroll) {
+        const firstPending = docs.find((d) => d.status === "PENDING_REVIEW");
+        if (firstPending) {
+          setTimeout(
+            () => pendingRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+            100
+          );
+        }
+      }
+    } catch (err) {
+      console.error(err);
     }
-
-    const found = vehicles.find((v) => v.vehicleId === selectedVehicleId);
-    if (found) setSelectedVehicle(found);
-  }, [vehicles, selectedVehicleId]);
-
-  // Scroll tới document pending đầu tiên
-  const firstPendingId =
-    selectedVehicle?.documents?.find((d) => d.status === "PENDING_REVIEW")
-      ?.vehicleDocumentId || null;
-
-  useEffect(() => {
-    if (firstPendingId && pendingRef.current) {
-      pendingRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [firstPendingId]);
+    setLoadingDocs(false);
+  };
 
   /* ===========================================================
-     UI HELPERS
+     CLICK ROW (FLOW giống UserPage)
+     - set selected
+     - gọi detail + docs
   ============================================================ */
+  const handleSelectVehicle = (v) => {
+    setSelectedVehicleId(v.vehicleId);
+    setSelectedVehicle({
+      ...v,
+      documents: [],
+      documentStatus: v.documentStatus || "NONE",
+    });
+    fetchVehicleDetail(v.vehicleId);
+    fetchVehicleDocuments(v.vehicleId, true);
+  };
+
   const formatDate = (value) => {
     if (!value) return "-";
     const d = new Date(value);
     return isNaN(d) ? "-" : d.toLocaleDateString();
   };
+
+  const firstPendingId =
+    selectedVehicle?.documents?.find((d) => d.status === "PENDING_REVIEW")
+      ?.vehicleDocumentId || null;
 
   /* ===========================================================
      RENDER
@@ -267,7 +344,7 @@ export default function VehiclePage() {
           {/* LEFT – LIST */}
           {/* ⭐ UPDATED: 5 -> 6 để khung list rộng hơn */}
           <div className="col-span-6">
-            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex flex-col h-[560px]">
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 flex flex-col h-[680px]">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
@@ -317,7 +394,7 @@ export default function VehiclePage() {
                     <option value="year">Year</option>
                     <option value="payload">Payload</option>
                     <option value="volume">Volume</option>
-                    <option value="createdAt">Created At</option>
+                    <option value="createdat">Created At</option>
                   </select>
 
                   <select
@@ -371,17 +448,14 @@ export default function VehiclePage() {
                             selectedVehicleId === v.vehicleId;
                           return (
                             <tr
-                              key={v.vehicleId}
-                              onClick={() => {
-                                setSelectedVehicleId(v.vehicleId);
-                                setSelectedVehicle(v);
-                              }}
-                              className={`cursor-pointer transition-colors ${
-                                isSelected
-                                  ? "bg-indigo-50/70"
-                                  : "hover:bg-gray-50"
-                              }`}
-                            >
+  key={v.vehicleId}
+  onClick={() => handleSelectVehicle(v)}
+  className={`cursor-pointer
+    ${v.hasPendingDocumentRequest ? "bg-amber-50 border-l-4 border-amber-400" : ""}
+    ${isSelected ? "bg-indigo-50/70" : "hover:bg-gray-50"}
+  `}
+>
+
                               <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
                                 {v.plateNumber}
                               </td>
@@ -473,6 +547,11 @@ export default function VehiclePage() {
                         <DocumentStatusBadge
                           status={selectedVehicle.documentStatus}
                         />
+                        {(loadingDetail || loadingDocs) && (
+                          <span className="text-[11px] text-gray-400">
+                            Loading...
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
                         {selectedVehicle.brand} • {selectedVehicle.model} •{" "}
@@ -569,7 +648,11 @@ export default function VehiclePage() {
                                   ? "border-amber-300 bg-amber-50/60"
                                   : "border-gray-100 bg-gray-50"
                               }`}
+
+                              
                             >
+                             
+
                               {/* HEADER */}
                               <div className="flex items-start justify-between mb-3">
                                 <div>
@@ -635,19 +718,26 @@ export default function VehiclePage() {
                               </div>
 
                               {/* REVIEW BUTTON */}
-                              {(doc.status === "PENDING_REVIEW" ||
-                                doc.status === "REJECTED") && (
-                                <button
-                                  onClick={() =>
-                                    navigate(
-                                      `/staff/vehicle-document-reviews/${doc.vehicleDocumentId}`
-                                    )
-                                  }
-                                  className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2"
-                                >
-                                  Review
-                                </button>
-                              )}
+                              {doc.status === "PENDING_REVIEW" && (
+  <button
+    onClick={() =>
+      navigate(`/staff/vehicle-document-reviews/${doc.vehicleDocumentId}`)
+    }
+    className="mt-3 w-full rounded-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 text-sm font-medium"
+  >
+    Review pending document
+  </button>)}
+{(doc.status === "REJECTED" || doc.status === "INACTIVE") && (
+  <button
+    onClick={() =>
+      navigate(`/staff/vehicle-document-reviews/${doc.vehicleDocumentId}`)
+    }
+    className="mt-2 w-full rounded-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 text-sm"
+  >
+    View review history
+  </button>
+)}
+                              
                             </div>
                           );
                         })}
