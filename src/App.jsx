@@ -7,6 +7,8 @@ import StaffDashboard from "./pages/staff/StaffDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 
 import RequireRole from "./components/RequireRole";
+import AdminUserPage from "./pages/admin/AdminUserPage";
+
 
 import ContractTemplatePage from "./pages/staff/ContractTemplatePage";
 import DeliveryRecordTemplatePage from "./pages/staff/DeliveryRecordTemplatePage";
@@ -23,6 +25,9 @@ import DocumentReviewDetail from "./pages/staff/DocumentReviewDetail";
 
 import VehicleDocumentReviewList from "./pages/staff/VehicleDocumentReviewList";
 import VehicleDocumentReviewDetail from "./pages/staff/VehicleDocumentReviewDetail";
+
+import TransactionPage from "./pages/admin/TransactionPage";
+
 
 
 import UserPage from "./pages/staff/UserPage";
@@ -167,6 +172,22 @@ export default function App() {
               </RequireRole>
             }
           />
+          <Route
+  path="/admin/transactions"
+  element={
+    <RequireRole allowedRoles={["Admin"]}>
+      <TransactionPage />
+    </RequireRole>
+  }
+/>
+<Route
+  path="/admin/users"
+  element={
+    <RequireRole allowedRoles={["Admin"]}>
+      <AdminUserPage />
+    </RequireRole>
+  }
+/>
 
           {/* DEFAULT */}
           <Route path="*" element={<Navigate to="/" replace />} />

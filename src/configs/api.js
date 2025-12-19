@@ -3,7 +3,10 @@ import axios from 'axios';
 
 // const baseURL = import.meta.env.VITE_BASE_URL;
 // const baseURL = 'http://192.168.100.49:5246/api/';
-const baseURL = 'http://localhost:5246/api/';
+// const baseURL = 'http://localhost:5246/api/';
+// const baseURL = 'https://api.driveshare-server.id.vn/api/'
+
+const baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const config = {
   baseURL,
